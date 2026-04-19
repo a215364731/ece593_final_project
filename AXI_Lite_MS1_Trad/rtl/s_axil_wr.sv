@@ -8,10 +8,6 @@
 //     - Write Data Channel    (W)
 //     - Write Response Channel(B)
 //
-//   Both AW and W channels are accepted independently (no ordering assumption).
-//   A write is committed to the memory array only when BOTH channels have
-//   been received.  Byte-lane strobes (WSTRB) are fully honoured.
-//
 // Parameters:
 //   DATA_WIDTH  - Width of the data bus in bits (32 or 64)
 //   ADDR_WIDTH  - Width of the address bus in bits

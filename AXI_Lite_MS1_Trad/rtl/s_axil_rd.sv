@@ -7,10 +7,6 @@
 //     - Read Address Channel (AR)
 //     - Read Data Channel    (R)
 //
-//   A registered (1-cycle) read is issued to the memory array on AR handshake.
-//   The read data is presented on the R channel one cycle later.
-//   Out-of-range addresses return 0 with a SLVERR response.
-//
 // Parameters:
 //   DATA_WIDTH  - Width of the data bus in bits (32 or 64)
 //   ADDR_WIDTH  - Width of the address bus in bits
