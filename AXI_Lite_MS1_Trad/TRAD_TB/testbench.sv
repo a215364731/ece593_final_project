@@ -151,13 +151,14 @@ logic [DATA_WIDTH-1:0] data;
 localparam RANDOM_SEED = 1;
 
 initial begin
+    $srandom(RANDOM_SEED);
     resetn = 0;
     #10; resetn = 1;
     repeat(10)@(posedge clk);
     for(int i = 0; i < 256; i++) begin
       addr = i*4;
       for(int j = 0; j < 1024; j++) begin
-        data = $urandom(RANDOM_SEED);
+        data = $urandom();
         write_transaction(addr, data);
         read_transaction(addr, data);
       end
