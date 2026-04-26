@@ -1,18 +1,14 @@
 // =============================================================================
-// monitor.sv
+// monitor.sv  (UPDATED FOR MS2 — publishes to coverage mailboxes too)
 // AXI4-Lite Bus Monitor
 //
 // Passively observes all five AXI4-Lite channels and reconstructs complete
-// write and read transactions, which are forwarded to the scoreboard via
-// separate write and read mailboxes.
+// write and read transactions, which are forwarded to:
+//   - the scoreboard via mon2scb_wr / mon2scb_rd
+//   - the coverage subscriber via mon2cov_wr / mon2cov_rd  (NEW)
 //
-// The monitor reconstructs transactions at the handshake level:
-//   Write: captures AW + W channels (independently), merges them, then
-//          captures the B response into one txn_t and sends to mon2scb_wr.
-//   Read:  captures the AR address and the R response into one txn_t and
-//          sends to mon2scb_rd.
-//
-// Both paths run as concurrent threads started from run().
+// Two consumers receive a copy of each transaction so coverage continues
+// to be collected even if the scoreboard is bypassed.
 // =============================================================================
 
 `ifndef AXI_MONITOR_SV
@@ -32,28 +28,34 @@ class monitor #(
   // --------------------------------------------------------------------------
   virtual axil_if #(DATA_WIDTH, ADDR_WIDTH) vif;
 
-  mailbox #(txn_t) mon2scb_wr;   // completed write transactions
-  mailbox #(txn_t) mon2scb_rd;   // completed read transactions
+  mailbox #(txn_t) mon2scb_wr;   // completed write txns -> scoreboard
+  mailbox #(txn_t) mon2scb_rd;   // completed read  txns -> scoreboard
+  mailbox #(txn_t) mon2cov_wr;   // completed write txns -> coverage  (NEW)
+  mailbox #(txn_t) mon2cov_rd;   // completed read  txns -> coverage  (NEW)
 
   bit verbose = 1;
 
   // --------------------------------------------------------------------------
   // Internal staging (AW and W may arrive in different cycles)
   // --------------------------------------------------------------------------
-  local mailbox #(txn_t) aw_mbx;   // AW captures awaiting a W
-  local mailbox #(txn_t) w_mbx;    // W captures awaiting an AW
+  local mailbox #(txn_t) aw_mbx;
+  local mailbox #(txn_t) w_mbx;
 
   // --------------------------------------------------------------------------
-  // Constructor
+  // Constructor (signature CHANGED — two extra mailbox arguments)
   // --------------------------------------------------------------------------
   function new(
     virtual axil_if #(DATA_WIDTH, ADDR_WIDTH) vif,
-    mailbox #(txn_t) mbx_wr,
-    mailbox #(txn_t) mbx_rd
+    mailbox #(txn_t) mbx_scb_wr,
+    mailbox #(txn_t) mbx_scb_rd,
+    mailbox #(txn_t) mbx_cov_wr,
+    mailbox #(txn_t) mbx_cov_rd
   );
     this.vif        = vif;
-    this.mon2scb_wr = mbx_wr;
-    this.mon2scb_rd = mbx_rd;
+    this.mon2scb_wr = mbx_scb_wr;
+    this.mon2scb_rd = mbx_scb_rd;
+    this.mon2cov_wr = mbx_cov_wr;
+    this.mon2cov_rd = mbx_cov_rd;
     aw_mbx = new();
     w_mbx  = new();
   endfunction
@@ -63,15 +65,15 @@ class monitor #(
   // --------------------------------------------------------------------------
   task run();
     fork
-      monitor_aw();   // snoop AW channel -> aw_mbx
-      monitor_w();    // snoop W  channel -> w_mbx
-      merge_write();  // merge aw_mbx + w_mbx -> wait for B -> mon2scb_wr
-      monitor_read(); // snoop AR + R       -> mon2scb_rd
+      monitor_aw();
+      monitor_w();
+      merge_write();
+      monitor_read();
     join_none
   endtask
 
   // --------------------------------------------------------------------------
-  // monitor_aw: capture every AW handshake
+  // monitor_aw
   // --------------------------------------------------------------------------
   local task monitor_aw();
     forever begin
@@ -87,7 +89,7 @@ class monitor #(
   endtask
 
   // --------------------------------------------------------------------------
-  // monitor_w: capture every W handshake
+  // monitor_w
   // --------------------------------------------------------------------------
   local task monitor_w();
     forever begin
@@ -103,12 +105,11 @@ class monitor #(
   endtask
 
   // --------------------------------------------------------------------------
-  // merge_write: pair AW + W, then wait for B response
+  // merge_write — pair AW + W, then wait for B response, then publish
   // --------------------------------------------------------------------------
   local task merge_write();
-    txn_t aw_txn, w_txn, merged;
+    txn_t aw_txn, w_txn, merged, cov_copy;
     forever begin
-      // Both arrive in any order; pick one, then wait for the other
       aw_mbx.get(aw_txn);
       w_mbx.get(w_txn);
 
@@ -124,30 +125,52 @@ class monitor #(
       merged.bresp = vif.monitor_cb.bresp;
 
       if (verbose) merged.print("MON");
+
+      // Publish to scoreboard
       mon2scb_wr.put(merged);
+
+      // Publish a separate copy to coverage (avoids cross-component aliasing)
+      cov_copy       = new();
+      cov_copy.mode  = merged.mode;
+      cov_copy.addr  = merged.addr;
+      cov_copy.prot  = merged.prot;
+      cov_copy.wdata = merged.wdata;
+      cov_copy.wstrb = merged.wstrb;
+      cov_copy.bresp = merged.bresp;
+      mon2cov_wr.put(cov_copy);
     end
   endtask
 
   // --------------------------------------------------------------------------
-  // monitor_read: capture AR + R pair
+  // monitor_read — capture AR + R pair, then publish to scb + cov
   // --------------------------------------------------------------------------
   local task monitor_read();
+    txn_t t, cov_copy;
     forever begin
-      txn_t t = new();
+      t = new();
       t.mode = TXN_READ;
 
-      // AR handshake
       @(vif.monitor_cb iff (vif.monitor_cb.arvalid && vif.monitor_cb.arready));
       t.addr = vif.monitor_cb.araddr;
       t.prot = vif.monitor_cb.arprot;
 
-      // R handshake
       @(vif.monitor_cb iff (vif.monitor_cb.rvalid && vif.monitor_cb.rready));
       t.rdata = vif.monitor_cb.rdata;
       t.rresp = vif.monitor_cb.rresp;
 
       if (verbose) t.print("MON");
+
+      // Publish to scoreboard
       mon2scb_rd.put(t);
+
+      // Publish a separate copy to coverage
+      cov_copy       = new();
+      cov_copy.mode  = t.mode;
+      cov_copy.addr  = t.addr;
+      cov_copy.prot  = t.prot;
+      cov_copy.rdata = t.rdata;
+      cov_copy.rresp = t.rresp;
+      mon2cov_rd.put(cov_copy);
     end
   endtask
 

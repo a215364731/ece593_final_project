@@ -1,5 +1,5 @@
 // =============================================================================
-// env.sv
+// env.sv  (UPDATED FOR MS2 — coverage component added)
 // AXI4-Lite Verification Environment
 //
 // Instantiates and connects all testbench components:
@@ -7,15 +7,11 @@
 //   - driver
 //   - monitor
 //   - scoreboard
+//   - coverage (NEW)
 //
-// The environment owns all mailboxes.  The test only interacts with the
-// environment (and through it, the generator's directed-txn queue).
-//
-// Lifecycle:
-//   env.init()  - creates all components and mailboxes
-//   env.run()    - forks generator, driver, monitor, scoreboard threads
-//   env.drain()  - waits for all in-flight transactions to complete
-//   env.report() - prints scoreboard summary and asserts pass/fail
+// New mailboxes:
+//   mon2cov_wr / mon2cov_rd — monitor publishes a copy of every observed
+//                              transaction to the coverage subscriber.
 // =============================================================================
 
 `ifndef AXI_ENV_SV
@@ -26,6 +22,7 @@
 `include "driver.sv"
 `include "monitor.sv"
 `include "scoreboard.sv"
+`include "coverage.sv"
 
 class env #(
   parameter int unsigned DATA_WIDTH = 32,
@@ -39,10 +36,11 @@ class env #(
   // --------------------------------------------------------------------------
   // Components
   // --------------------------------------------------------------------------
-  generator  #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)  gen;
-  driver     #(DATA_WIDTH, ADDR_WIDTH)             drv;
-  monitor    #(DATA_WIDTH, ADDR_WIDTH)             mon;
+  generator  #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)            gen;
+  driver     #(DATA_WIDTH, ADDR_WIDTH)                       drv;
+  monitor    #(DATA_WIDTH, ADDR_WIDTH)                       mon;
   scoreboard #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH, MEM_INIT)  scb;
+  coverage   #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)            cov;   // NEW
 
   // --------------------------------------------------------------------------
   // Mailboxes
@@ -50,6 +48,8 @@ class env #(
   mailbox #(txn_t) gen2drv;
   mailbox #(txn_t) mon2scb_wr;
   mailbox #(txn_t) mon2scb_rd;
+  mailbox #(txn_t) mon2cov_wr;     // NEW
+  mailbox #(txn_t) mon2cov_rd;     // NEW
 
   // --------------------------------------------------------------------------
   // Virtual interface (set by the test before build)
@@ -70,12 +70,15 @@ class env #(
     gen2drv    = new();
     mon2scb_wr = new();
     mon2scb_rd = new();
+    mon2cov_wr = new();
+    mon2cov_rd = new();
 
     // Components
     gen = new(gen2drv);
     drv = new(vif, gen2drv);
-    mon = new(vif, mon2scb_wr, mon2scb_rd);
+    mon = new(vif, mon2scb_wr, mon2scb_rd, mon2cov_wr, mon2cov_rd);  // CHANGED
     scb = new(mon2scb_wr, mon2scb_rd);
+    cov = new(mon2cov_wr, mon2cov_rd);                                // NEW
 
     // Config
     gen.num_transactions = num_transactions;
@@ -83,6 +86,7 @@ class env #(
     drv.verbose          = verbose;
     mon.verbose          = verbose;
     scb.verbose          = verbose;
+    cov.verbose          = verbose;
 
     $display("[ENV] Init complete. num_transactions=%0d", num_transactions);
   endfunction
@@ -97,12 +101,12 @@ class env #(
       drv.run();
       mon.run();
       scb.run();
+      cov.run();      // NEW
     join_none
   endtask
 
   // --------------------------------------------------------------------------
-  // drain() - wait until the generator is done AND the scoreboard has
-  //           processed all expected transactions
+  // drain()
   // --------------------------------------------------------------------------
   task drain(int unsigned timeout_cycles = 10000);
     int unsigned total_expected;
@@ -110,7 +114,6 @@ class env #(
 
     total_expected = gen.directed_txn_q.size() + gen.num_transactions;
 
-    // Poll until scoreboard has seen all transactions or timeout
     waited = 0;
     while ((scb.writes_checked + scb.reads_checked) < total_expected) begin
       @(posedge vif.clk);
@@ -122,7 +125,6 @@ class env #(
       end
     end
 
-    // A few extra cycles for final responses to propagate
     repeat (10) @(posedge vif.clk);
     $display("[ENV] Drain complete after %0d cycles.", waited);
   endtask
@@ -132,6 +134,7 @@ class env #(
   // --------------------------------------------------------------------------
   function void report();
     scb.report();
+    cov.report();   // NEW
     if (scb.errors > 0)
       $fatal(1, "[ENV] Simulation FAILED with %0d scoreboard errors.", scb.errors);
     else

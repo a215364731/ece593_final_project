@@ -1,23 +1,12 @@
 // =============================================================================
-// tb_top.sv
+// testbench_top.sv  (UPDATED FOR MS2 — cov_iface instantiated)
 // AXI4-Lite Testbench Top Level
-//
-// Instantiates:
-//   - axi_if  (interface)
-//   - s_axil_top (DUT)
-//   - Clock/reset generation
-//   - Test selection via TEST_NAME plusarg
-//
-// Usage (Questa/VCS example):
-//   vsim tb_top +TEST_NAME=test_random
-//   vsim tb_top +TEST_NAME=test_wr_rd_same
-//   vsim tb_top +TEST_NAME=test_byte_strobe
-//   vsim tb_top +TEST_NAME=test_backpressure
 // =============================================================================
 
 `timescale 1ns / 1ps
 
 `include "axil_if.sv"
+`include "cov_iface.sv"
 `include "tests.sv"
 
 module testbench_top;
@@ -40,7 +29,6 @@ module testbench_top;
 
   always #(CLK_PERIOD_NS / 2.0) clk = ~clk;
 
-  // Reset: assert for 10 cycles then release
   initial begin
     resetn = 0;
     repeat (10) @(posedge clk);
@@ -98,27 +86,31 @@ module testbench_top;
   );
 
   // --------------------------------------------------------------------------
+  // Coverage — cycle-level / protocol coverage  (NEW)
+  // --------------------------------------------------------------------------
+  cov_iface #(
+    .DATA_WIDTH ( DATA_WIDTH ),
+    .ADDR_WIDTH ( ADDR_WIDTH ),
+    .MEM_DEPTH  ( MEM_DEPTH  )
+  ) u_cov_iface (
+    .clk    ( clk    ),
+    .resetn ( resetn ),
+    .vif    ( dut_if )
+  );
+
+  // --------------------------------------------------------------------------
   // Test execution
   // --------------------------------------------------------------------------
   initial begin
-    test_random #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH, MEM_INIT) t1 = new(dut_if);
+    test_random     #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH, MEM_INIT) t1 = new(dut_if);
     test_wr_rd_same #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH, MEM_INIT) t2 = new(dut_if);
 
-    test_base #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH, MEM_INIT) tests[2];
-    tests[0] = t1;
-    tests[1] = t2;
     // Wait for reset to release
     @(posedge resetn);
     @(posedge clk);
 
-    // ----------------------------------------------------------
     t1.run();
-    // ----------------------------------------------------------
     t2.run();
-    // ----------------------------------------------------------
-    // test_byte_strobe #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH) t =
-    //   new(dut_if);
-    // t.run();
 
     $display("[TB] Test complete at time %0t ns.", $time);
     $finish;
