@@ -1,12 +1,20 @@
 // =============================================================================
-// testbench_top.sv  (UPDATED FOR MS2 — cov_iface instantiated)
+// testbench_top.sv
 // AXI4-Lite Testbench Top Level
+//
+// Instantiates:
+//   - axi_if  (interface)
+//   - s_axil_top (DUT)
+//   - Clock/reset generation
+//
+// Functional coverage is embedded in the testbench classes:
+//   - Transaction-level covergroups: scoreboard.sv
+//   - Cycle-level covergroups:       monitor.sv
 // =============================================================================
 
 `timescale 1ns / 1ps
 
 `include "axil_if.sv"
-`include "cov_iface.sv"
 `include "tests.sv"
 
 module testbench_top;
@@ -86,26 +94,12 @@ module testbench_top;
   );
 
   // --------------------------------------------------------------------------
-  // Coverage — cycle-level / protocol coverage  (NEW)
-  // --------------------------------------------------------------------------
-  cov_iface #(
-    .DATA_WIDTH ( DATA_WIDTH ),
-    .ADDR_WIDTH ( ADDR_WIDTH ),
-    .MEM_DEPTH  ( MEM_DEPTH  )
-  ) u_cov_iface (
-    .clk    ( clk    ),
-    .resetn ( resetn ),
-    .vif    ( dut_if )
-  );
-
-  // --------------------------------------------------------------------------
   // Test execution
   // --------------------------------------------------------------------------
   initial begin
     test_random     #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH, MEM_INIT) t1 = new(dut_if);
     test_wr_rd_same #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH, MEM_INIT) t2 = new(dut_if);
 
-    // Wait for reset to release
     @(posedge resetn);
     @(posedge clk);
 
