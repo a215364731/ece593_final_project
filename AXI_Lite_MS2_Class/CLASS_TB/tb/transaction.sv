@@ -9,7 +9,7 @@
 `ifndef AXI_TRANSACTION_SV
 `define AXI_TRANSACTION_SV
 
-typedef enum logic { TXN_WRITE, TXN_READ } txn_mode;
+typedef enum logic [1:0] { TXN_WRITE, TXN_READ, TXN_BOTH } txn_mode;
 
 class transaction #(
   parameter int unsigned DATA_WIDTH = 32,
@@ -41,9 +41,14 @@ class transaction #(
     addr < (1 << ADDR_WIDTH);
   }
 
-  // At least one strobe bit active on writes
+  // At least one strobe bit active on writes and read+writes
   constraint c_wstrb_nonzero {
-    mode == TXN_WRITE -> wstrb != '0;
+    (mode == TXN_WRITE || mode == TXN_BOTH) -> wstrb != '0;
+  }
+
+  // Random transactions use only WRITE or READ (not BOTH)
+  constraint c_mode_random {
+    mode inside { TXN_WRITE, TXN_READ };
   }
 
   // --------------------------------------------------------------------------
@@ -59,6 +64,11 @@ class transaction #(
       $display("[%s] WRITE | addr=0x%0h | wdata=0x%0h | wstrb=0b%0b | bresp=%0b | prot=%0b",
               tag,
               addr, wdata, wstrb, bresp, prot);
+    end
+    if(mode == TXN_BOTH) begin
+      $display("[%s] READ+WRITE | addr=0x%0h | wdata=0x%0h | wstrb=0b%0b | rdata=0x%0h | bresp=%0b | rresp=%0b | prot=%0b",
+              tag,
+              addr, wdata, wstrb, rdata, bresp, rresp, prot);
     end
   endfunction
 

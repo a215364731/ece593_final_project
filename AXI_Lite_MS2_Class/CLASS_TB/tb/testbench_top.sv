@@ -30,20 +30,11 @@ module testbench_top;
   localparam real CLK_PERIOD_NS = 10.0;  // 100 MHz
 
   // --------------------------------------------------------------------------
-  // Clock and reset
+  // Clock
   // --------------------------------------------------------------------------
-  logic clk    = 0;
-  logic resetn = 0;
+  logic clk = 0;
 
   always #(CLK_PERIOD_NS / 2.0) clk = ~clk;
-
-  initial begin
-    resetn = 0;
-    repeat (10) @(posedge clk);
-    @(negedge clk);
-    resetn = 1;
-    $display("[TB] Reset released at time %0t", $time);
-  end
 
   // --------------------------------------------------------------------------
   // Interface
@@ -52,8 +43,7 @@ module testbench_top;
     .DATA_WIDTH ( DATA_WIDTH ),
     .ADDR_WIDTH ( ADDR_WIDTH )
   ) dut_if (
-    .clk    ( clk    ),
-    .resetn ( resetn )
+    .clk ( clk )
   );
 
   // --------------------------------------------------------------------------
@@ -66,7 +56,7 @@ module testbench_top;
     .MEM_INIT   ( MEM_INIT   )
   ) dut (
     .clk            ( clk                ),
-    .resetn         ( resetn             ),
+    .resetn         ( dut_if.resetn      ),
 
     .s_axi_awvalid  ( dut_if.awvalid     ),
     .s_axi_awready  ( dut_if.awready     ),
@@ -97,14 +87,19 @@ module testbench_top;
   // Test execution
   // --------------------------------------------------------------------------
   initial begin
-    test_random     #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH, MEM_INIT) t1 = new(dut_if);
-    test_wr_rd_same #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH, MEM_INIT) t2 = new(dut_if);
+    test_random       #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH, MEM_INIT) t1 = new(dut_if);
+    test_wr_rd_same   #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH, MEM_INIT) t2 = new(dut_if);
+    test_byte_strobe   #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH, MEM_INIT) t3 = new(dut_if);
+    test_concurrent_rw #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH, MEM_INIT) t4 = new(dut_if);
 
-    @(posedge resetn);
+    // Wait for clock to start and interface to be ready
+    @(posedge clk);
     @(posedge clk);
 
     t1.run();
     t2.run();
+    t3.run();
+    t4.run();
 
     $display("[TB] Test complete at time %0t ns.", $time);
     $finish;

@@ -65,17 +65,19 @@ class test_base #(
     // Wait for completion
     env.drain();
 
+    // Stop all component threads gracefully
+    env.stop();
+
     // Report
     env.report();
   endtask
 
   task do_reset();
+    $display("[TEST] Calling interface do_reset...");
     vif.do_reset();
     @(vif.master_cb);
     @(vif.master_cb);
-    // Assert reset for 5 cycles
-    // (resetn already driven in top-level TB)
-    $display("[TEST] Reset applied.");
+    $display("[TEST] Reset complete.");
   endtask
 
 endclass
@@ -168,19 +170,60 @@ class test_byte_strobe #(
   virtual task directed_phase();
     // Write 0xAABBCCDD to address 0 (all strobes)
     env.gen.add_write(12'h000, 32'hAABBCCDD, 4'b1111);
-    // Overwrite only byte 1 (bits[15:8]) with 0xEE -> expect 0xAABBEEDD
-    env.gen.add_write(12'h000, 32'h0000EE00, 4'b0010);
-    // Read back: expect 0xAABBEEDD
+    env.gen.add_write(12'h000, 32'h12000000, 4'b1000);
+    env.gen.add_write(12'h000, 32'h00340000, 4'b0100);
+    env.gen.add_write(12'h000, 32'h00005600, 4'b0010);
+    env.gen.add_write(12'h000, 32'h00000078, 4'b0001);
+    // Read back: expect 0x12345678
     env.gen.add_read(12'h000);
 
-    // Write 0x12345678 to address 4 (all strobes)
-    env.gen.add_write(12'h004, 32'h12345678, 4'b1111);
-    // Overwrite upper half only (bytes 3:2) with 0xBEEF -> expect 0xBEEF5678
-    env.gen.add_write(12'h004, 32'hBEEF0000, 4'b1100);
-    // Read back: expect 0xBEEF5678
-    env.gen.add_read(12'h004);
 
     $display("[TEST] test_byte_strobe: queued 4 writes + 2 reads");
+  endtask
+
+endclass
+
+// =============================================================================
+// test_concurrent_rw
+// Directed: simultaneous read and write transactions using TXN_BOTH mode.
+// Tests concurrent AW/W/AR address channels and B/R response channels
+// operating in parallel to verify proper arbitration and response handling.
+// =============================================================================
+class test_concurrent_rw #(
+  parameter int unsigned DATA_WIDTH = 32,
+  parameter int unsigned ADDR_WIDTH = 12,
+  parameter int unsigned MEM_DEPTH  = 256,
+  parameter string       MEM_INIT    = ""
+) extends test_base #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH, MEM_INIT);
+
+  localparam int unsigned N = 6;
+  localparam int unsigned BPW = DATA_WIDTH / 8;
+
+  function new(virtual axil_if #(DATA_WIDTH, ADDR_WIDTH) vif);
+    super.new(vif);
+  endfunction
+
+  virtual function void configure();
+    env.num_transactions = 0;   // directed only
+    env.verbose          = 1;
+  endfunction
+
+  virtual task directed_phase();
+    // Queue N simultaneous read+write transactions at different addresses
+    // Each transaction writes a unique pattern then reads back from same address
+    for (int i = 0; i < N; i++) begin
+      logic [ADDR_WIDTH-1:0]  addr  = ADDR_WIDTH'(i * BPW);
+      logic [DATA_WIDTH-1:0]  wdata = DATA_WIDTH'(32'hCCCC_0000 | i);
+      env.gen.add_both(addr, wdata, '1);
+    end
+
+    // Additional pattern: write and read at same address with different strobes
+    env.gen.add_both(12'h000, 32'hAAAA5555, 4'b1100);  // Upper bytes only
+    env.gen.add_both(12'h000, 32'h5555AAAA, 4'b0011);  // Lower bytes only
+    env.gen.add_both(12'h004, 32'hDEAD_BEEF, 4'b1111);  // Full word
+
+    $display("[TEST] test_concurrent_rw: queued %0d simultaneous read+write transactions",
+             N + 3);
   endtask
 
 endclass

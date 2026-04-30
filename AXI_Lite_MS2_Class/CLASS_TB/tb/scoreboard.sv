@@ -45,7 +45,6 @@ class scoreboard #(
   // Shadow memory model
   // --------------------------------------------------------------------------
   local logic [DATA_WIDTH-1:0] shadow_mem   [0:MEM_DEPTH-1];
-  local bit                    shadow_valid [0:MEM_DEPTH-1];
 
   // --------------------------------------------------------------------------
   // Statistics
@@ -297,12 +296,10 @@ class scoreboard #(
       $warning("[SCB] update_shadow: address 0x%0h out of range (MEM_DEPTH=%0d)", addr, MEM_DEPTH);
       return;
     end
-    if (!shadow_valid[idx]) shadow_mem[idx] = '0;
     for (int b = 0; b < STRB_WIDTH; b++) begin
       if (wstrb[b])
         shadow_mem[idx][b*8 +: 8] = wdata[b*8 +: 8];
     end
-    shadow_valid[idx] = 1;
   endfunction
 
   local function int unsigned addr_to_idx(logic [ADDR_WIDTH-1:0] addr);

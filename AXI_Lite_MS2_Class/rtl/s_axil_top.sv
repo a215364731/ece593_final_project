@@ -68,8 +68,15 @@ module s_axil_top #(
 
   logic [DATA_WIDTH-1:0] mem [0:MEM_DEPTH-1];
 
-  // Optional memory init
+  // Optional memory init: reload on every reset de-assertion (resetn rising edge)
   initial begin
+    if (MEM_INIT != "") begin
+      $readmemh(MEM_INIT, mem);
+    end
+  end
+
+  // Reload memory every time resetn transitions from 0 to 1
+  always @(posedge resetn) begin
     if (MEM_INIT != "") begin
       $readmemh(MEM_INIT, mem);
     end

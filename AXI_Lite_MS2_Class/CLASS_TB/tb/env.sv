@@ -120,6 +120,16 @@ class env #(
   endtask
 
   // --------------------------------------------------------------------------
+  // stop() - terminate all component threads
+  // --------------------------------------------------------------------------
+  task stop();
+    $display("[ENV] Stopping all component threads...");
+    disable fork;
+    repeat (5) @(posedge vif.clk);
+    $display("[ENV] All threads stopped.");
+  endtask
+
+  // --------------------------------------------------------------------------
   // report()
   // --------------------------------------------------------------------------
   function void report();

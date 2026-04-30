@@ -126,6 +126,24 @@ class generator #(
     directed_txn_q.push_back(t);
   endfunction
 
+  // --------------------------------------------------------------------------
+  // Convenience: queue a directed read+write (simultaneous on same cycle)
+  // --------------------------------------------------------------------------
+  function void add_both(
+    logic [ADDR_WIDTH-1:0]      addr,
+    logic [DATA_WIDTH-1:0]      wdata,
+    logic [(DATA_WIDTH/8)-1:0]  strb = '1,
+    logic [2:0]                 prot = '0
+  );
+    txn_t t = new();
+    t.mode  = TXN_BOTH;
+    t.addr  = addr;
+    t.wdata = wdata;
+    t.wstrb = strb;
+    t.prot  = prot;
+    directed_txn_q.push_back(t);
+  endfunction
+
 endclass
 
 `endif // AXI_GENERATOR_SV

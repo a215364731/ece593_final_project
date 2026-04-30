@@ -24,4 +24,4 @@ cov:
 	@echo "HTML coverage report: urg_report/dashboard.html"
 
 clean:
-	rm -rf AN.DB csrc simv* ucli.key novas* logs work* verdi* urgReport urg_report .fsm.sch.verilog.xml cm.log
+	rm -rf AN.DB csrc simv* ucli.key novas* logs work* verdi* urgReport urg_report .fsm.sch.verilog.xml cm.log vc_hdrs.h

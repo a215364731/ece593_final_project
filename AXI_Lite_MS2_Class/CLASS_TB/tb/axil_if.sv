@@ -13,9 +13,11 @@ interface axil_if #(
   parameter int unsigned DATA_WIDTH = 32,
   parameter int unsigned ADDR_WIDTH = 12
 )(
-  input logic clk,
-  input logic resetn
+  input logic clk
 );
+
+  // resetn is driven by the master (driver), not an input
+  logic resetn;
 
   // Write Address Channel (AW)
   logic                      awvalid;
@@ -51,6 +53,9 @@ interface axil_if #(
   clocking master_cb @(posedge clk);
     default input #1step output #1;
 
+    // Reset (driven by master)
+    output resetn;
+
     // AW
     output awvalid, awaddr, awprot;
     input  awready;
@@ -76,6 +81,7 @@ interface axil_if #(
   clocking monitor_cb @(posedge clk);
     default input #1step;
 
+    input resetn;
     input awvalid, awready, awaddr, awprot;
     input wvalid,  wready,  wdata,  wstrb;
     input bvalid,  bready,  bresp;
@@ -86,13 +92,18 @@ interface axil_if #(
   // --------------------------------------------------------------------------
   // Modports
   // --------------------------------------------------------------------------
-  modport MASTER  (clocking master_cb,  input clk, resetn);
-  modport MONITOR (clocking monitor_cb, input clk, resetn);
+  modport MASTER  (clocking master_cb,  input clk);
+  modport MONITOR (clocking monitor_cb, input clk);
 
   // --------------------------------------------------------------------------
-  // Reset task (convenience)
+  // Reset task - asserts and deasserts resetn, clears all signals
   // --------------------------------------------------------------------------
   task automatic do_reset();
+    // Assert reset
+    master_cb.resetn <= 1'b0;
+    repeat (10) @(posedge clk);
+    
+    // Clear all signals
     master_cb.awvalid <= '0;
     master_cb.awaddr  <= '0;
     master_cb.awprot  <= '0;
@@ -104,6 +115,10 @@ interface axil_if #(
     master_cb.araddr  <= '0;
     master_cb.arprot  <= '0;
     master_cb.rready  <= '0;
+    
+    // Release reset
+    master_cb.resetn <= 1'b1;
+    repeat (5) @(posedge clk);
   endtask
 
 endinterface

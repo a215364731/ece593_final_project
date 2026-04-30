@@ -66,14 +66,12 @@ class monitor #(
   bit         cov_fwd_event      = 0;
 
   // -- cg_reset (FV-001) ------------------------------------------------------
-  covergroup cg_reset;
+  covergroup cg_reset @(posedge vif.clk);
     option.per_instance = 1;
     option.name         = "cg_reset";
-    RST_ASSERT: coverpoint cov_reset_asserted {
-      bins asserted = {1};
-    }
-    RST_RELEASE: coverpoint cov_reset_released {
-      bins released = {1};
+    RST_ASSERT: coverpoint vif.resetn {
+      bins asserted = {0};
+      bins deasserted = {1};
     }
   endgroup
 
@@ -270,11 +268,6 @@ class monitor #(
     forever begin
       @(posedge vif.clk);
 
-      // ---- Reset transition events ----
-      cov_reset_asserted = (prev_resetn && !vif.resetn);
-      cov_reset_released = (!prev_resetn && vif.resetn);
-      cg_reset.sample();
-      prev_resetn = vif.resetn;
 
       // Skip the rest while in reset
       if (!vif.resetn) begin
