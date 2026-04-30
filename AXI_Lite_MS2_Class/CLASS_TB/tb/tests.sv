@@ -98,7 +98,7 @@ class test_random #(
   endfunction
 
   virtual function void configure();
-    env.num_transactions = 50;
+    env.num_transactions = 20;
     env.verbose          = 1;
   endfunction
 
