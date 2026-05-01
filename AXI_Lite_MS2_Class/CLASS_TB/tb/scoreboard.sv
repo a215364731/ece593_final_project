@@ -52,6 +52,7 @@ class scoreboard #(
   int unsigned writes_checked = 0;
   int unsigned reads_checked  = 0;
   int unsigned errors         = 0;
+  int unsigned txn_num        = 0;      // Transaction number counter
 
   bit verbose = 1;
 
@@ -208,18 +209,19 @@ class scoreboard #(
     forever begin
       mon2scb_wr.get(txn);
       writes_checked++;
+      txn_num++;
 
       // --- Update shadow memory ---
       update_shadow(txn.addr, txn.wdata, txn.wstrb);
 
       // --- Check bresp ---
       if (txn.bresp !== 2'b00) begin
-        $error("[SCB] WRITE ERROR: bresp=0b%02b expected OKAY(00) addr=0x%0h",
-               txn.bresp, txn.addr);
+        $error("[SCB] TXN#%0d WRITE ERROR: bresp=0b%02b expected OKAY(00) addr=0x%0h",
+               txn_num, txn.bresp, txn.addr);
         errors++;
       end else if (verbose) begin
-        $display("[SCB] WRITE OK  addr=0x%0h data=0x%0h strb=0b%0b bresp=%0b",
-                 txn.addr, txn.wdata, txn.wstrb, txn.bresp);
+        $display("[SCB] TXN#%0d WRITE OK  addr=0x%0h data=0x%0h strb=0b%0b bresp=%0b",
+                 txn_num, txn.addr, txn.wdata, txn.wstrb, txn.bresp);
       end
 
       // --- Sample functional coverage ---
@@ -248,11 +250,12 @@ class scoreboard #(
     forever begin
       mon2scb_rd.get(txn);
       reads_checked++;
+      txn_num++;
 
       // --- Check rresp ---
       if (txn.rresp !== 2'b00) begin
-        $error("[SCB] READ  ERROR: rresp=0b%02b expected OKAY(00) addr=0x%0h",
-               txn.rresp, txn.addr);
+        $error("[SCB] TXN#%0d READ  ERROR: rresp=0b%02b expected OKAY(00) addr=0x%0h",
+               txn_num, txn.rresp, txn.addr);
         errors++;
       end
 
@@ -260,12 +263,12 @@ class scoreboard #(
       word_idx = addr_to_idx(txn.addr);
       expected = shadow_mem[word_idx];
       if (txn.rdata !== expected) begin
-        $error("[SCB] READ  MISMATCH: addr=0x%0h got=0x%0h expected=0x%0h",
-                txn.addr, txn.rdata, expected);
+        $error("[SCB] TXN#%0d READ  MISMATCH: addr=0x%0h got=0x%0h expected=0x%0h",
+                txn_num, txn.addr, txn.rdata, expected);
         errors++;
       end else if (verbose) begin
-        $display("[SCB] READ  OK  addr=0x%0h data=0x%0h rresp=%0b",
-                 txn.addr, txn.rdata, txn.rresp);
+        $display("[SCB] TXN#%0d READ  OK  addr=0x%0h data=0x%0h rresp=%0b",
+                 txn_num, txn.addr, txn.rdata, txn.rresp);
       end
 
       // --- Sample functional coverage ---
@@ -320,6 +323,7 @@ class scoreboard #(
 
     $display("======================================================");
     $display("[SCB] SCOREBOARD REPORT");
+    $display("  Total transactions   : %0d", txn_num);
     $display("  Writes checked : %0d", writes_checked);
     $display("  Reads  checked : %0d", reads_checked);
     $display("  Errors found   : %0d", errors);
