@@ -199,7 +199,11 @@ class axil_byte_strobe_seq #(
     send_write(12'h000, 32'h00000078, 4'b0001);
     // Read back: expect 0x12345678
     send_read(12'h000);
-    `uvm_info("SEQ", "axil_byte_strobe_seq: 5 writes + 1 read", UVM_MEDIUM)
+    for(int i = 1; i < 16; i++) begin
+      send_write(12'h000, 32'h87654321, i);
+      send_read(12'h000);
+    end
+    `uvm_info("SEQ", "axil_byte_strobe_seq: all strobe types", UVM_MEDIUM)
   endtask
 
 endclass
@@ -231,6 +235,29 @@ class axil_concurrent_seq #(
     send_both(12'h000, 32'h5555AAAA, 4'b0011);
     send_both(12'h004, 32'hDEADBEEF, 4'b1111);
     `uvm_info("SEQ", $sformatf("axil_concurrent_seq: %0d TXN_BOTH transactions", N + 3), UVM_MEDIUM)
+  endtask
+
+endclass
+
+// =============================================================================
+// axil_addr_oor_seq — Write to an out of range address and expect an error response
+// =============================================================================
+class axil_addr_oor_seq #(
+  parameter int unsigned DATA_WIDTH = 32,
+  parameter int unsigned ADDR_WIDTH = 12,
+  parameter int unsigned MEM_DEPTH  = 256
+) extends axil_base_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH);
+
+  `uvm_object_param_utils(axil_addr_oor_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH))
+
+  function new(string name = "axil_addr_oor_seq");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_write(ADDR_WIDTH'(MEM_DEPTH * (DATA_WIDTH/8)+ 4), 32'hDEAD_BEEF, '1);
+    send_read(ADDR_WIDTH'(MEM_DEPTH * (DATA_WIDTH/8)+ 4));
+    `uvm_info("SEQ", $sformatf("axil_addr_oor_seq: Address out of range"), UVM_MEDIUM)
   endtask
 
 endclass

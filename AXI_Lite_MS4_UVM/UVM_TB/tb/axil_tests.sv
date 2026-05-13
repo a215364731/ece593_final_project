@@ -40,9 +40,11 @@ class axil_test extends uvm_test;
   axil_wr_rd_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH) wr_rd_seq;
   axil_byte_strobe_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH) byte_strobe_seq;
   axil_concurrent_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH) concurrent_seq;
+  axil_addr_oor_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH) addr_oor_seq;
 
   function new(string name = "axil_test", uvm_component parent);
     super.new(name, parent);
+    `uvm_info("TEST", "axil_test created", UVM_HIGH)
   endfunction
 
   // --------------------------------------------------------------------------
@@ -56,6 +58,7 @@ class axil_test extends uvm_test;
     wr_rd_seq = axil_wr_rd_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)::type_id::create("wr_rd_seq");
     byte_strobe_seq = axil_byte_strobe_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)::type_id::create("byte_strobe_seq");
     concurrent_seq = axil_concurrent_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)::type_id::create("concurrent_seq");
+    addr_oor_seq = axil_addr_oor_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)::type_id::create("addr_oor_seq");
   endfunction
 
   // --------------------------------------------------------------------------
@@ -80,6 +83,9 @@ class axil_test extends uvm_test;
     
     `uvm_info("TEST", "Starting axil_test_concurrent_rw", UVM_MEDIUM)
     run_concurrent_test();
+
+    `uvm_info("TEST", "Starting axil_test_addr_oor", UVM_MEDIUM)
+    run_addr_oor_test();
     
     phase.drop_objection(this);
   endtask
@@ -107,6 +113,11 @@ class axil_test extends uvm_test;
   // Concurrent read+write test
   virtual task run_concurrent_test();
     concurrent_seq.start(env.agent.sequencer);
+  endtask
+
+  // Address out of range test
+  virtual task run_addr_oor_test();
+    addr_oor_seq.start(env.agent.sequencer);
   endtask
 
 endclass

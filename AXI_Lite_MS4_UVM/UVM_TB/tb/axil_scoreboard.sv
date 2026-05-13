@@ -181,16 +181,20 @@ class axil_scoreboard #(
   
   function void check_writes(item_t txn);
     writes_checked++;
-    update_shadow(txn.addr, txn.wdata, txn.wstrb);
 
-    if (txn.bresp !== 2'b00) begin
+    if (txn.bresp == 2'b00) begin
+      update_shadow(txn.addr, txn.wdata, txn.wstrb);
+      `uvm_info("SCB", $sformatf(
+        "WRITE OK  addr=0x%0h data=0x%0h strb=0b%0b bresp=%0b",
+        txn.addr, txn.wdata, txn.wstrb, txn.bresp), UVM_MEDIUM)
+    end else if (txn.bresp == 2'b10 && txn.addr >= MEM_DEPTH * (ADDR_WIDTH/8)) begin
+      `uvm_info("SCB", $sformatf(
+        "WRITE SLVERR addr=0x%0h data=0x%0h strb=0b%0b bresp=%0b",
+        txn.addr, txn.wdata, txn.wstrb, txn.bresp), UVM_MEDIUM)
+    end else begin
       `uvm_error("SCB", $sformatf(
         "WRITE ERROR: bresp=0b%02b expected OKAY(00) addr=0x%0h", txn.bresp, txn.addr))
       errors++;
-    end else begin
-      `uvm_info("SCB", $sformatf(
-        "WRITE OK  addr=0x%0h data=0x%0h strb=0b%0b bresp=%0b",
-        txn.addr, txn.wdata, txn.wstrb, txn.bresp), UVM_HIGH)
     end
 
     cov_addr     = txn.addr;
@@ -212,23 +216,28 @@ class axil_scoreboard #(
     int unsigned           word_idx;
     reads_checked++;
 
-    if (txn.rresp !== 2'b00) begin
+    if(txn.rresp == 2'b10 && txn.addr >= MEM_DEPTH * (ADDR_WIDTH/8)) begin
+      `uvm_info("SCB", $sformatf(
+        "READ SLVERR addr=0x%0h rresp=%0b skipping read check", txn.addr, txn.rresp), UVM_MEDIUM)
+    end else if (txn.rresp !== 2'b00) begin
       `uvm_error("SCB", $sformatf(
         "READ ERROR: rresp=0b%02b expected OKAY(00) addr=0x%0h", txn.rresp, txn.addr))
       errors++;
     end
 
-    word_idx = addr_to_idx(txn.addr);
-    expected = shadow_mem[word_idx];
-    if (txn.rdata !== expected) begin
-      `uvm_error("SCB", $sformatf(
-        "READ MISMATCH: addr=0x%0h got=0x%0h expected=0x%0h",
-        txn.addr, txn.rdata, expected))
-      errors++;
-    end else begin
-      `uvm_info("SCB", $sformatf(
-        "READ OK  addr=0x%0h data=0x%0h rresp=%0b",
-        txn.addr, txn.rdata, txn.rresp), UVM_HIGH)
+    if (txn.rresp == 2'b00) begin
+      word_idx = addr_to_idx(txn.addr);
+      expected = shadow_mem[word_idx];
+      if (txn.rdata !== expected) begin
+        `uvm_error("SCB", $sformatf(
+          "READ MISMATCH: addr=0x%0h got=0x%0h expected=0x%0h",
+          txn.addr, txn.rdata, expected))
+        errors++;
+      end else begin
+        `uvm_info("SCB", $sformatf(
+          "READ OK  addr=0x%0h data=0x%0h rresp=%0b",
+          txn.addr, txn.rdata, txn.rresp), UVM_MEDIUM)
+      end
     end
 
     cov_addr     = txn.addr;

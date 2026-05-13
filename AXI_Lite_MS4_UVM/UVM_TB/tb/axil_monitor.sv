@@ -137,6 +137,7 @@ class axil_monitor #(
     cg_fwd     = new();
     cg_bp_b    = new();
     cg_bp_r    = new();
+    `uvm_info("MON", "axil_monitor created", UVM_HIGH)
   endfunction
 
   // --------------------------------------------------------------------------
@@ -215,7 +216,7 @@ class axil_monitor #(
       @(vif.monitor_cb iff (vif.monitor_cb.bvalid && vif.monitor_cb.bready));
       merged.bresp = vif.monitor_cb.bresp;
 
-      `uvm_info("MON", merged.convert2string(), UVM_HIGH)
+      `uvm_info("MON", merged.convert2string(), UVM_MEDIUM)
       monitor_port.write(merged);   // replaces mon2scb_wr.put()
     end
   endtask
@@ -237,7 +238,7 @@ class axil_monitor #(
       t.rdata = vif.monitor_cb.rdata;
       t.rresp = vif.monitor_cb.rresp;
 
-      `uvm_info("MON", t.convert2string(), UVM_HIGH)
+      `uvm_info("MON", t.convert2string(), UVM_MEDIUM)
       monitor_port.write(t);         // replaces mon2scb_rd.put()
     end
   endtask
