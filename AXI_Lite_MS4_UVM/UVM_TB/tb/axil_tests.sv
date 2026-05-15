@@ -42,6 +42,11 @@ class axil_test extends uvm_test;
   axil_concurrent_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH) concurrent_seq;
   axil_addr_oor_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH) addr_oor_seq;
 
+  // --------------------------------------------------------------------------
+  // UVM logging — file handle for the persistent log
+  // --------------------------------------------------------------------------
+  int log_fd;
+
   function new(string name = "axil_test", uvm_component parent);
     super.new(name, parent);
     `uvm_info("TEST", "axil_test created", UVM_HIGH)
@@ -59,6 +64,28 @@ class axil_test extends uvm_test;
     byte_strobe_seq = axil_byte_strobe_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)::type_id::create("byte_strobe_seq");
     concurrent_seq = axil_concurrent_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)::type_id::create("concurrent_seq");
     addr_oor_seq = axil_addr_oor_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)::type_id::create("addr_oor_seq");
+  endfunction
+
+  // --------------------------------------------------------------------------
+  // start_of_simulation_phase — set up UVM logging
+  //
+  // Opens axil_uvm.log and routes every uvm_* message at this component and
+  // below to BOTH the simulator transcript (UVM_DISPLAY) and the log file
+  // (UVM_LOG). The `+UVM_LOG_FILE=<name>` plusarg can override this at run
+  // time. The hier variants apply the setting to every child component, so
+  // env / agent / driver / monitor / scoreboard all log automatically.
+  // --------------------------------------------------------------------------
+  virtual function void start_of_simulation_phase(uvm_phase phase);
+    super.start_of_simulation_phase(phase);
+    log_fd = $fopen("axil_uvm.log", "w");
+    if (log_fd == 0)
+      `uvm_fatal("LOG", "Failed to open axil_uvm.log for writing")
+    set_report_default_file_hier(log_fd);
+    set_report_severity_action_hier(UVM_INFO,    UVM_DISPLAY | UVM_LOG);
+    set_report_severity_action_hier(UVM_WARNING, UVM_DISPLAY | UVM_LOG);
+    set_report_severity_action_hier(UVM_ERROR,   UVM_DISPLAY | UVM_LOG | UVM_COUNT);
+    set_report_severity_action_hier(UVM_FATAL,   UVM_DISPLAY | UVM_LOG | UVM_EXIT);
+    `uvm_info("LOG", "UVM logging enabled: writing to axil_uvm.log", UVM_NONE)
   endfunction
 
   // --------------------------------------------------------------------------
@@ -89,6 +116,17 @@ class axil_test extends uvm_test;
     
     phase.drop_objection(this);
   endtask
+
+  // --------------------------------------------------------------------------
+  // final_phase — close the UVM log file
+  // --------------------------------------------------------------------------
+  virtual function void final_phase(uvm_phase phase);
+    super.final_phase(phase);
+    if (log_fd != 0) begin
+      $fclose(log_fd);
+      log_fd = 0;
+    end
+  endfunction
 
   // --------------------------------------------------------------------------
   // Test scenario tasks
