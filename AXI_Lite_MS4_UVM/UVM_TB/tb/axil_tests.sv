@@ -77,7 +77,7 @@ class axil_test extends uvm_test;
   // --------------------------------------------------------------------------
   virtual function void start_of_simulation_phase(uvm_phase phase);
     super.start_of_simulation_phase(phase);
-    log_fd = $fopen("axil_uvm.log", "w");
+    log_fd = $fopen("logs/axil_uvm.log", "w");
     if (log_fd == 0)
       `uvm_fatal("LOG", "Failed to open axil_uvm.log for writing")
     set_report_default_file_hier(log_fd);
