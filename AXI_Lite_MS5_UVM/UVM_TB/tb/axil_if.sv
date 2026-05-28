@@ -100,6 +100,8 @@ interface axil_if #(
   // --------------------------------------------------------------------------
   task automatic do_reset();
     // Assert reset
+    master_cb.resetn <= 1'b1;
+    repeat (5) @(posedge clk);
     master_cb.resetn <= 1'b0;
     repeat (10) @(posedge clk);
     

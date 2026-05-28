@@ -56,6 +56,7 @@ class axil_test extends uvm_test;
   // Test environment
   // --------------------------------------------------------------------------
   axil_env #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH) env;
+  virtual axil_if #(DATA_WIDTH, ADDR_WIDTH) vif;
 
   // --------------------------------------------------------------------------
   // Sequence properties
@@ -115,6 +116,9 @@ class axil_test extends uvm_test;
   virtual function void build_phase(uvm_phase phase);
     super.build_phase(phase);
     env = axil_env #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)::type_id::create("env", this);
+    if (!uvm_config_db #(virtual axil_if #(DATA_WIDTH, ADDR_WIDTH))::get(
+          this, "*", "vif", vif))
+      `uvm_fatal("TEST", "failed to get vif in uvm_config_db")
     
     random_seq = axil_random_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)::type_id::create("random_seq");
     wr_rd_seq = axil_wr_rd_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)::type_id::create("wr_rd_seq");
@@ -179,6 +183,7 @@ class axil_test extends uvm_test;
   virtual task run_phase(uvm_phase phase);
     phase.raise_objection(this);
     
+    vif.do_reset();
     `uvm_info("TEST", "Starting axil_test_random", UVM_MEDIUM)
     run_random_test();
     

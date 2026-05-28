@@ -110,12 +110,6 @@ module axil_tb_top;
       null, "uvm_test_top.*", "mem_init", MEM_INIT);
   end
 
-  // --------------------------------------------------------------------------
-  // Reset ? applied once before run_test(); tests no longer call do_reset()
-  // --------------------------------------------------------------------------
-  initial begin
-    axil_bus.do_reset();
-  end
 
   // --------------------------------------------------------------------------
   // UVM entry point ? test selected via +UVM_TESTNAME plusarg
