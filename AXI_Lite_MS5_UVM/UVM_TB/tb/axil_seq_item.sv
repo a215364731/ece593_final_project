@@ -13,7 +13,7 @@
 `define AXIL_SEQ_ITEM_SV
 
 
-typedef enum logic [1:0] { TXN_WRITE, TXN_READ, TXN_BOTH } txn_mode_e;
+typedef enum logic [1:0] { TXN_WRITE, TXN_READ, TXN_BOTH, TXN_BOTH_DIFF } txn_mode_e;
 
 class axil_seq_item #(
   parameter int unsigned DATA_WIDTH = 32,
@@ -98,6 +98,9 @@ class axil_seq_item #(
         addr, rdata, rresp, prot);
       TXN_BOTH:  s = $sformatf(
         "BOTH  addr=0x%0h wdata=0x%0h wstrb=0b%0b rdata=0x%0h bresp=%0b rresp=%0b prot=%0b",
+        addr, wdata, wstrb, rdata, bresp, rresp, prot);
+      TXN_BOTH_DIFF:  s = $sformatf(
+        "BOTH_DIFF  addr=0x%0h wdata=0x%0h wstrb=0b%0b rdata=0x%0h bresp=%0b rresp=%0b prot=%0b",
         addr, wdata, wstrb, rdata, bresp, rresp, prot);
       default:   s = "UNKNOWN";
     endcase

@@ -41,6 +41,7 @@ class axil_test extends uvm_test;
   axil_byte_strobe_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH) byte_strobe_seq;
   axil_concurrent_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH) concurrent_seq;
   axil_addr_oor_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH) addr_oor_seq;
+  axil_unaligned_rd_wr_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH) unaligned_rd_wr_seq;
 
   // --------------------------------------------------------------------------
   // UVM logging — file handle for the persistent log
@@ -64,6 +65,7 @@ class axil_test extends uvm_test;
     byte_strobe_seq = axil_byte_strobe_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)::type_id::create("byte_strobe_seq");
     concurrent_seq = axil_concurrent_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)::type_id::create("concurrent_seq");
     addr_oor_seq = axil_addr_oor_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)::type_id::create("addr_oor_seq");
+    unaligned_rd_wr_seq = axil_unaligned_rd_wr_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH)::type_id::create("unaligned_rd_wr_seq");
   endfunction
 
   // --------------------------------------------------------------------------
@@ -113,6 +115,9 @@ class axil_test extends uvm_test;
 
     `uvm_info("TEST", "Starting axil_test_addr_oor", UVM_MEDIUM)
     run_addr_oor_test();
+
+    `uvm_info("TEST", "Starting axil_test_unaligned_rd_wr", UVM_MEDIUM)
+    run_unaligned_rd_wr_test();
     
     phase.drop_objection(this);
   endtask
@@ -156,6 +161,10 @@ class axil_test extends uvm_test;
   // Address out of range test
   virtual task run_addr_oor_test();
     addr_oor_seq.start(env.agent.sequencer);
+  endtask
+
+  virtual task run_unaligned_rd_wr_test();
+    unaligned_rd_wr_seq.start(env.agent.sequencer);
   endtask
 
 endclass

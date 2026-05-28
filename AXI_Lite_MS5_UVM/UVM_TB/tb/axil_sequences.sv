@@ -42,10 +42,14 @@ class axil_base_seq #(
     logic [ADDR_WIDTH-1:0]     addr,
     logic [DATA_WIDTH-1:0]     data,
     logic [(DATA_WIDTH/8)-1:0] strb = '1,
-    logic [2:0]                prot = '0
+    logic [2:0]                prot = '0,
+    int constraint_mode = 1
   );
     item_t item = item_t::type_id::create("wr_item");
     start_item(item);
+    if(constraint_mode == 0) begin
+      item.c_addr_align.constraint_mode(0);
+    end
     if (!item.randomize() with {
       mode  == TXN_WRITE;
       addr  == local::addr;
@@ -61,10 +65,14 @@ class axil_base_seq #(
   // --------------------------------------------------------------------------
   protected task send_read(
     logic [ADDR_WIDTH-1:0] addr,
-    logic [2:0]            prot = '0
+    logic [2:0]            prot = '0,
+    int constraint_mode = 1
   );
     item_t item = item_t::type_id::create("rd_item");
     start_item(item);
+    if(constraint_mode == 0) begin
+      item.c_addr_align.constraint_mode(0);
+    end
     if (!item.randomize() with {
       mode == TXN_READ;
       addr == local::addr;
@@ -93,6 +101,26 @@ class axil_base_seq #(
       wstrb == local::strb;
       prot  == local::prot;
     }) `uvm_fatal("SEQ", "Randomize failed for directed both")
+    finish_item(item);
+  endtask
+
+  protected task send_both_diff(
+    logic [ADDR_WIDTH-1:0]     addr,
+    logic [DATA_WIDTH-1:0]     wdata,
+    logic [(DATA_WIDTH/8)-1:0] strb = '1,
+    logic [2:0]                prot = '0
+  );
+    item_t item = item_t::type_id::create("both_item");
+    start_item(item);
+    // Must disable c_mode_random to allow TXN_BOTH
+    item.c_mode_random.constraint_mode(0);
+    if (!item.randomize() with {
+      mode  == TXN_BOTH_DIFF;
+      addr  == local::addr;
+      wdata == local::wdata;
+      wstrb == local::strb;
+      prot  == local::prot;
+    }) `uvm_fatal("SEQ", "Randomize failed for directed both, different addr")
     finish_item(item);
   endtask
 
@@ -234,7 +262,10 @@ class axil_concurrent_seq #(
     send_both(12'h000, 32'hAAAA5555, 4'b1100);
     send_both(12'h000, 32'h5555AAAA, 4'b0011);
     send_both(12'h004, 32'hDEADBEEF, 4'b1111);
-    `uvm_info("SEQ", $sformatf("axil_concurrent_seq: %0d TXN_BOTH transactions", N + 3), UVM_MEDIUM)
+
+    send_both_diff(12'h008, 32'hDEADBEEF, 4'b1111);
+    send_both_diff(12'h010, 32'hDEADBEEF, 4'b1111);
+    `uvm_info("SEQ", $sformatf("axil_concurrent_seq: %0d TXN_BOTH transactions", N + 5), UVM_MEDIUM)
   endtask
 
 endclass
@@ -257,9 +288,45 @@ class axil_addr_oor_seq #(
   virtual task body();
     send_write(ADDR_WIDTH'(MEM_DEPTH * (DATA_WIDTH/8)+ 4), 32'hDEAD_BEEF, '1);
     send_read(ADDR_WIDTH'(MEM_DEPTH * (DATA_WIDTH/8)+ 4));
+    send_write(12'hff0, 32'hDEAD_BEEF, '1);
+    send_read(12'hff0);
+
     `uvm_info("SEQ", $sformatf("axil_addr_oor_seq: Address out of range"), UVM_MEDIUM)
   endtask
 
 endclass
+
+// =============================================================================
+// axil_unaligned_rd_wr_seq — Unaligned address test (should be rejected by the DUT)
+// =============================================================================
+class axil_unaligned_rd_wr_seq #(
+  parameter int unsigned DATA_WIDTH = 32,
+  parameter int unsigned ADDR_WIDTH = 12,
+  parameter int unsigned MEM_DEPTH  = 256
+) extends axil_base_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH);
+
+  `uvm_object_param_utils(axil_unaligned_rd_wr_seq #(DATA_WIDTH, ADDR_WIDTH, MEM_DEPTH))
+
+  localparam int unsigned N   = 8;
+  localparam int unsigned BPW = DATA_WIDTH / 8;
+
+  function new(string name = "axil_unaligned_rd_wr_seq");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_write(12'h001, 32'hAABBCCDD, 4'b1111,0,0);
+    send_write(12'h002, 32'h11223344, 4'b1111,0,0);
+    send_write(12'h003, 32'h55667788, 4'b1111,0,0);
+
+    send_read(12'h001,0,0);
+    send_read(12'h002,0,0);
+    send_read(12'h003,0,0);
+
+    `uvm_info("SEQ", $sformatf("axil_unaligned_rd_wr_seq: "), UVM_MEDIUM)
+  endtask
+
+endclass
+
 
 `endif // AXIL_SEQUENCES_SV

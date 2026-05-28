@@ -70,7 +70,8 @@ class axil_driver #(
       case (item.mode)
         TXN_WRITE: drive_write(item);
         TXN_READ:  drive_read(item);
-        TXN_BOTH:  drive_both(item);
+        TXN_BOTH:  drive_both(item, 0);
+        TXN_BOTH_DIFF:  drive_both(item, 1);
         default:   `uvm_error("DRV", "Unknown transaction mode")
       endcase
 
@@ -159,7 +160,7 @@ class axil_driver #(
   // drive_both: simultaneous AW + W + AR on the same clock edge
   // (carried over from driver.sv unchanged)
   // --------------------------------------------------------------------------
-  task automatic drive_both(item_t item);
+  task automatic drive_both(item_t item, int diff);
     int aw_delay, w_delay, ar_delay, max_delay;
 
     aw_delay  = $urandom_range(0, max_aw_delay);
@@ -171,14 +172,20 @@ class axil_driver #(
     repeat (max_delay) @(vif.master_cb);
 
     vif.master_cb.awvalid <= 1'b1;
-    vif.master_cb.awaddr  <= item.addr;
     vif.master_cb.awprot  <= item.prot;
     vif.master_cb.wvalid  <= 1'b1;
     vif.master_cb.wdata   <= item.wdata;
     vif.master_cb.wstrb   <= item.wstrb;
     vif.master_cb.arvalid <= 1'b1;
-    vif.master_cb.araddr  <= item.addr;
     vif.master_cb.arprot  <= item.prot;
+
+    if(diff == 0) begin
+      vif.master_cb.awaddr  <= item.addr;
+      vif.master_cb.araddr  <= item.addr;
+    end else begin
+      vif.master_cb.awaddr  <= item.addr;
+      vif.master_cb.araddr  <= item.addr + 4; // same burst, next beat
+    end
 
     @(vif.master_cb iff (vif.master_cb.awready &&
                          vif.master_cb.wready  &&
