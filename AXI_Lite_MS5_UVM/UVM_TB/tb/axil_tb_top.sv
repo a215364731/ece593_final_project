@@ -4,7 +4,7 @@
 //
 // Migration notes:
 //   - Static instantiation of clock, interface, and DUT is unchanged
-//   - Sequential test execution block removed — run_test() dispatches
+//   - Sequential test execution block removed ? run_test() dispatches
 //     whichever test is selected via +UVM_TESTNAME on the command line
 //   - Virtual interface pushed into uvm_config_db once, available to all
 //     components through the hierarchy
@@ -25,7 +25,7 @@
 
 `timescale 1ns/1ps
 
-`include "axil_if.sv"        // unchanged from original — interface, clocking blocks, do_reset()
+`include "axil_if.sv"        // unchanged from original ? interface, clocking blocks, do_reset()
 
 
 module axil_tb_top;
@@ -43,12 +43,19 @@ module axil_tb_top;
   `include "axil_tests.sv" 
 
   // --------------------------------------------------------------------------
-  // Parameters — match the DUT
+  // Parameters ? match the DUT
   // --------------------------------------------------------------------------
   localparam int unsigned DATA_WIDTH = 32;
   localparam int unsigned ADDR_WIDTH = 12;
   localparam int unsigned MEM_DEPTH  = 256;
+  // MEM_INIT can be overridden at compile time with +define+MEM_INIT_EMPTY
+  // to exercise the "no initialization" else-branches on s_axil_top.sv:73,80
+  // (coverage closure). Used by the `make compile_no_init` target.
+`ifdef MEM_INIT_EMPTY
+  localparam string       MEM_INIT   = "";
+`else
   localparam string       MEM_INIT   = "./tb/mem_init.hex";
+`endif
 
   // --------------------------------------------------------------------------
   // Clock generation  (unchanged from testbench_top.sv)
@@ -92,7 +99,7 @@ module axil_tb_top;
   );
 
   // --------------------------------------------------------------------------
-  // UVM config DB — push the virtual interface so all components can get it
+  // UVM config DB ? push the virtual interface so all components can get it
   // --------------------------------------------------------------------------
   initial begin
     uvm_config_db #(virtual axil_if #(DATA_WIDTH, ADDR_WIDTH))::set(
@@ -104,14 +111,14 @@ module axil_tb_top;
   end
 
   // --------------------------------------------------------------------------
-  // Reset — applied once before run_test(); tests no longer call do_reset()
+  // Reset ? applied once before run_test(); tests no longer call do_reset()
   // --------------------------------------------------------------------------
   initial begin
     axil_bus.do_reset();
   end
 
   // --------------------------------------------------------------------------
-  // UVM entry point — test selected via +UVM_TESTNAME plusarg
+  // UVM entry point ? test selected via +UVM_TESTNAME plusarg
   // --------------------------------------------------------------------------
   initial begin
     run_test("axil_test"); 

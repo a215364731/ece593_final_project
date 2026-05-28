@@ -19,7 +19,7 @@
 `include "axil_seq_item.sv"
 
 // =============================================================================
-// axil_base_seq — shared helpers for all sequences
+// axil_base_seq ? shared helpers for all sequences
 // =============================================================================
 class axil_base_seq #(
   parameter int unsigned DATA_WIDTH = 32,
@@ -135,7 +135,7 @@ class axil_base_seq #(
 endclass
 
 // =============================================================================
-// axil_random_seq — fully random write/read mix
+// axil_random_seq ? fully random write/read mix
 // Replaces: test_random (directed_phase was empty, 50 random txns)
 // =============================================================================
 class axil_random_seq #(
@@ -172,7 +172,7 @@ class axil_random_seq #(
 endclass
 
 // =============================================================================
-// axil_wr_rd_seq — write then read back same addresses
+// axil_wr_rd_seq ? write then read back same addresses
 // Replaces: test_wr_rd_same directed_phase()
 // =============================================================================
 class axil_wr_rd_seq #(
@@ -203,7 +203,7 @@ class axil_wr_rd_seq #(
 endclass
 
 // =============================================================================
-// axil_byte_strobe_seq — partial byte-lane write verification
+// axil_byte_strobe_seq ? partial byte-lane write verification
 // Replaces: test_byte_strobe directed_phase()
 // =============================================================================
 class axil_byte_strobe_seq #(
@@ -237,7 +237,7 @@ class axil_byte_strobe_seq #(
 endclass
 
 // =============================================================================
-// axil_concurrent_seq — simultaneous read+write (TXN_BOTH)
+// axil_concurrent_seq ? simultaneous read+write (TXN_BOTH)
 // Replaces: test_concurrent_rw directed_phase()
 // =============================================================================
 class axil_concurrent_seq #(
@@ -271,7 +271,7 @@ class axil_concurrent_seq #(
 endclass
 
 // =============================================================================
-// axil_addr_oor_seq — Write to an out of range address and expect an error response
+// axil_addr_oor_seq ? Write to an out of range address and expect an error response
 // =============================================================================
 class axil_addr_oor_seq #(
   parameter int unsigned DATA_WIDTH = 32,
@@ -297,7 +297,7 @@ class axil_addr_oor_seq #(
 endclass
 
 // =============================================================================
-// axil_unaligned_rd_wr_seq — Unaligned address test (should be rejected by the DUT)
+// axil_unaligned_rd_wr_seq ? Unaligned address test (should be rejected by the DUT)
 // =============================================================================
 class axil_unaligned_rd_wr_seq #(
   parameter int unsigned DATA_WIDTH = 32,
@@ -322,6 +322,21 @@ class axil_unaligned_rd_wr_seq #(
     send_read(12'h001,0,0);
     send_read(12'h002,0,0);
     send_read(12'h003,0,0);
+
+    // ---- Address bit[1] toggle closure -------------------------------------
+    // Drive an address with bit[1]=1 immediately followed by bit[1]=0 so the
+    // latched address registers (aw_addr_lat[1] / ar_addr_lat[1]) toggle 1->0.
+    // Without this back-to-back set-then-clear pattern, bit[1] only ever
+    // toggles 0->1, leaving the 1->0 toggle uncovered.
+    send_write(12'h002, 32'hDEADBEEF, 4'b1111,0,0);   // bit[1]=1
+    send_write(12'h000, 32'hCAFEBABE, 4'b1111,0,0);   // bit[1]=0  -> aw_addr_lat[1] 1->0
+    send_write(12'h006, 32'h12345678, 4'b1111,0,0);   // bit[1]=1
+    send_write(12'h004, 32'h87654321, 4'b1111,0,0);   // bit[1]=0
+
+    send_read(12'h002,0,0);   // bit[1]=1
+    send_read(12'h000,0,0);   // bit[1]=0  -> ar_addr_lat[1] 1->0
+    send_read(12'h006,0,0);   // bit[1]=1
+    send_read(12'h004,0,0);   // bit[1]=0
 
     `uvm_info("SEQ", $sformatf("axil_unaligned_rd_wr_seq: "), UVM_MEDIUM)
   endtask

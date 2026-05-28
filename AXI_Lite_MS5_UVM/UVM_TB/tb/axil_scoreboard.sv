@@ -44,6 +44,7 @@ class axil_scoreboard #(
   int unsigned writes_checked = 0;
   int unsigned reads_checked  = 0;
   int unsigned errors         = 0;
+  bit          env_check_failed = 0;   // set by check_phase if zero txns observed
 
   // --------------------------------------------------------------------------
   // Functional coverage — Transaction-Level  (unchanged from scoreboard.sv)
@@ -290,6 +291,24 @@ class axil_scoreboard #(
     end
   endtask
   // --------------------------------------------------------------------------
+  // check_phase — self-check: scoreboard must observe transactions.
+  // Fires UVM_ERROR if zero transactions were checked, catching structural
+  // env bugs (e.g. disconnected analysis port) that would otherwise yield a
+  // silent PASS with nothing actually verified.
+  // --------------------------------------------------------------------------
+  virtual function void check_phase(uvm_phase phase);
+    super.check_phase(phase);
+    if (writes_checked == 0 && reads_checked == 0) begin
+      env_check_failed = 1;
+      `uvm_error("SCB",
+        "ENV CHECK FAILED: scoreboard observed ZERO transactions. \
+This indicates the monitor's analysis port is not connected, the \
+agent is not active, or the test launched no sequences. Possible \
+env bug - review connect_phase wiring.")
+    end
+  endfunction
+
+  // --------------------------------------------------------------------------
   // report_phase — replaces report(); called automatically by UVM
   // --------------------------------------------------------------------------
   virtual function void report_phase(uvm_phase phase);
@@ -300,8 +319,10 @@ class axil_scoreboard #(
     `uvm_info("SCB", $sformatf("  Writes checked : %0d", writes_checked), UVM_NONE)
     `uvm_info("SCB", $sformatf("  Reads  checked : %0d", reads_checked),  UVM_NONE)
     `uvm_info("SCB", $sformatf("  Errors found   : %0d", errors),         UVM_NONE)
-    if (errors == 0)
+    if (errors == 0 && !env_check_failed)
       `uvm_info("SCB", "  RESULT: ** PASS **", UVM_NONE)
+    else if (env_check_failed)
+      `uvm_error("SCB", "  RESULT: ** FAIL ** (env check: zero transactions observed)")
     else
       `uvm_error("SCB", $sformatf("  RESULT: ** FAIL ** (%0d errors)", errors))
     `uvm_info("SCB", "======================================================", UVM_NONE)
