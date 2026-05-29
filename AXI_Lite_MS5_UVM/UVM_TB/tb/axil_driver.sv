@@ -59,6 +59,8 @@ class axil_driver #(
   virtual task run_phase(uvm_phase phase);
     item_t item;
 
+    vif.do_reset();
+
     // Wait for reset to de-assert before driving
     @(posedge vif.clk iff vif.resetn);
     @(vif.master_cb);

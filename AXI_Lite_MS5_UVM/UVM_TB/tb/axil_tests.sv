@@ -183,7 +183,6 @@ class axil_test extends uvm_test;
   virtual task run_phase(uvm_phase phase);
     phase.raise_objection(this);
     
-    vif.do_reset();
     `uvm_info("TEST", "Starting axil_test_random", UVM_MEDIUM)
     run_random_test();
     
